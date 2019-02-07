@@ -48,7 +48,7 @@ def getAllHaikuDevices() {
                         def responseParts = response.tokenize(';')
                         def room = responseParts.get(0).substring(1)
                         def model = responseParts.get(4).substring(0, responseParts.get(4).length() - 1)
-                        optionsMap[(address)] = "${room} [${model}]"
+                        optionsMap[("${address};${room}")] = "${room} [${model}]"
                     }
                 }
             } catch (SocketTimeoutException e) {
@@ -86,12 +86,13 @@ def setLevel(level, duration) {
     }
 
     try {
-        def haikuCommand = generateCommand("Bedroom Fan", "LIGHT", "PWR", "ON")
+        def ipAndRoom = settings.haikuDevice.tokenize(';')
 
+        def haikuCommand = generateCommand(ipAndRoom.get(1), "LIGHT", "PWR", "ON")
         def hubAction = new hubitat.device.HubAction(haikuCommand,
                 hubitat.device.Protocol.LAN,
                 [type: hubitat.device.HubAction.Type.LAN_TYPE_UDPCLIENT,
-                 destinationAddress: "${settings.haikuDevice}:31415"])
+                 destinationAddress: "${ipAndRoom.get(0)}:31415"])
         sendHubCommand(hubAction)
 
         if (udpListeningSocket != null) {
