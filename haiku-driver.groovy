@@ -2,6 +2,7 @@ metadata {
     definition(name: "Haiku Fan", namespace: "community", author: "Zack Brown") {
         capability "FanControl"
         capability "SwitchLevel"
+        capability "Switch"
     }
 }
 
@@ -43,12 +44,15 @@ def getAllHaikuDevices() {
                     def response = new String(data).trim()
                     if (!response.isEmpty() && response.charAt(0) == '(') {
                         String address = receivePacket.getAddress().getHostAddress()
-                        if (logEnable) log.debug "Live signal from Haiku[${address}] ${response}"
+                        if (logEnable) log.debug "Alive signal from Haiku[${address}] ${response}"
 
                         def responseParts = response.tokenize(';')
-                        def room = responseParts.get(0).substring(1)
-                        def model = responseParts.get(4).substring(0, responseParts.get(4).length() - 1)
-                        optionsMap[("${address};${room}")] = "${room} [${model}]"
+
+                        if (responseParts.size() > 1 && responseParts.get(1) == "DEVICE") {
+                            def room = responseParts.get(0).substring(1)
+                            def model = responseParts.get(4).substring(0, responseParts.get(4).length() - 1)
+                            optionsMap[("${address};${room}")] = "${room} [${model}]"
+                        }
                     }
                 }
             } catch (SocketTimeoutException e) {
@@ -71,11 +75,19 @@ def logsOff() {
     device.updateSetting("logEnable", [value: "false", type: "bool"])
 }
 
-def setLevel(level) {
-    setLevel(level, 0)
+def on() {
+    sendLightPowerCommand("ON")
 }
 
-def setLevel(level, duration) {
+def off() {
+    sendLightPowerCommand("OFF")
+}
+
+def sendLightPowerCommand(String command) {
+    sendCommand("LIGHT", "PWR", command)
+}
+
+def sendCommand(String haikuSubDevice, String haikuFunction, String command) {
     if (logEnable) log.debug "setting level to ${level} for ${device.deviceNetworkId}"
 
     def udpListeningSocket = null
@@ -88,7 +100,7 @@ def setLevel(level, duration) {
     try {
         def ipAndRoom = settings.haikuDevice.tokenize(';')
 
-        def haikuCommand = generateCommand(ipAndRoom.get(1), "LIGHT", "PWR", "ON")
+        def haikuCommand = generateCommand(ipAndRoom.get(1), haikuSubDevice, haikuFunction, command)
         def hubAction = new hubitat.device.HubAction(haikuCommand,
                 hubitat.device.Protocol.LAN,
                 [type: hubitat.device.HubAction.Type.LAN_TYPE_UDPCLIENT,
@@ -103,7 +115,7 @@ def setLevel(level, duration) {
 
             def response = new String(data)
             def address = receivePacket.getAddress().getHostAddress()
-            if (logEnable) log.debug "Response from Haiku[${address}] ${response}"
+            if (logEnable) log.debug "sendCommand: Response from Haiku[${address}] ${response}"
         }
     } catch (Exception e) {
         log.error "Call to on failed: ${e.message}"
@@ -114,6 +126,14 @@ def setLevel(level, duration) {
     }
 }
 
+def setLevel(level) {
+    setLevel(level, 0)
+}
+
+def setLevel(level, duration) {
+
+}
+
 def setSpeed(fanspeed){
     if (logEnable) log.debug "in setspeed"
 }
@@ -122,6 +142,6 @@ def parse(String description) {
     if (logEnable) log.debug "parse description: ${description}"
 }
 
-static def generateCommand(location, device, function, command) {
-    return "<${location};${device};${function};${command}>"
+static def generateCommand(haikuLocation, haikuSubDevice, haikuFunction, command) {
+    return "<${haikuLocation};${haikuSubDevice};${haikuFunction};${command}>"
 }
