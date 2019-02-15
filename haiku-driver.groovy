@@ -13,53 +13,50 @@ preferences {
     }
 }
 
+def installed() {
+    if (logEnable) log.debug "installed"
+}
+
+def updated() {
+    if (logEnable) log.debug "updated"
+}
+
 def getAllHaikuDevices() {
     def udpListeningSocket = null
     try {
-        udpListeningSocket = new DatagramSocket(31415)
-        udpListeningSocket.setSoTimeout(1000);
-    } catch (BindException e) {
-        log.error "getAllHaikuDevices: Haiku port 31415 on Hubitat is in use"
-    }
-
-    try {
         def haikuCommand = generateCommand("ALL", "DEVICE", "ID", "GET")
+        sendUDPRequest("192.168.1.255", "31415", haikuCommand)
 
-        def hubAction = new hubitat.device.HubAction(haikuCommand,
-                hubitat.device.Protocol.LAN,
-                [type: hubitat.device.HubAction.Type.LAN_TYPE_UDPCLIENT,
-                 destinationAddress: "192.168.1.255:31415"])
-        sendHubCommand(hubAction)
-
+        udpListeningSocket = new DatagramSocket(31415)
+        udpListeningSocket.setSoTimeout(3000);
         def optionsMap = new LinkedHashMap()
-        def start = new Date()
-        while (new Date().getTime() - start.getTime() < 3000) {
-            try {
-                if (udpListeningSocket != null) {
-                    def receiveData = new byte[128]
-                    def receivePacket = new DatagramPacket(receiveData, receiveData.length)
-                    udpListeningSocket.receive(receivePacket)
-                    def data = receivePacket.getData()
+        try {
+            while (true) {
+                def receiveData = new byte[128]
+                def receivePacket = new DatagramPacket(receiveData, receiveData.length)
+                udpListeningSocket.receive(receivePacket)
+                def data = receivePacket.getData()
 
-                    def response = new String(data).trim()
-                    if (!response.isEmpty() && response.charAt(0) == '(') {
-                        String address = receivePacket.getAddress().getHostAddress()
-                        if (logEnable) log.debug "Alive signal from Haiku[${address}] ${response}"
+                def response = new String(data).trim()
+                if (!response.isEmpty() && response.charAt(0) == '(') {
+                    String address = receivePacket.getAddress().getHostAddress()
+                    if (logEnable) log.debug "Alive signal from Haiku[${address}] ${response}"
 
-                        def responseParts = response.tokenize(';')
+                    def responseParts = response.tokenize(';')
 
-                        if (responseParts.size() > 1 && responseParts.get(1) == "DEVICE") {
-                            def room = responseParts.get(0).substring(1)
-                            def model = responseParts.get(4).substring(0, responseParts.get(4).length() - 1)
-                            optionsMap[("${address};${room}")] = "${room} [${model}]"
-                        }
+                    if (responseParts.size() > 1 && responseParts.get(1) == "DEVICE") {
+                        def room = responseParts.get(0).substring(1)
+                        def model = responseParts.get(4).substring(0, responseParts.get(4).length() - 1)
+                        optionsMap[("${address};${room}")] = "${room} [${model}]"
                     }
                 }
-            } catch (SocketTimeoutException e) {
             }
+        } catch (SocketTimeoutException e) {
         }
 
         return optionsMap
+    } catch (BindException e) {
+        log.warn "getAllHaikuDevices: Haiku port 31415 on Hubitat is in use"
     } catch (Exception e) {
         log.error "Call to on failed: ${e.message}"
     } finally {
@@ -92,31 +89,21 @@ def sendCommand(String haikuSubDevice, String haikuFunction, String command) {
 
     def udpListeningSocket = null
     try {
-        udpListeningSocket = new DatagramSocket(31415)
-    } catch (BindException e) {
-        log.error "Haiku port 31415 on Hubitat is in use"
-    }
-
-    try {
         def ipAndRoom = settings.haikuDevice.tokenize(';')
-
         def haikuCommand = generateCommand(ipAndRoom.get(1), haikuSubDevice, haikuFunction, command)
-        def hubAction = new hubitat.device.HubAction(haikuCommand,
-                hubitat.device.Protocol.LAN,
-                [type: hubitat.device.HubAction.Type.LAN_TYPE_UDPCLIENT,
-                 destinationAddress: "${ipAndRoom.get(0)}:31415"])
-        sendHubCommand(hubAction)
+        sendUDPRequest(ipAndRoom.get(0), "31415", haikuCommand)
 
-        if (udpListeningSocket != null) {
-            def receiveData = new byte[128]
-            def receivePacket = new DatagramPacket(receiveData, receiveData.length)
-            udpListeningSocket.receive(receivePacket)
-            def data = receivePacket.getData()
+        udpListeningSocket = new DatagramSocket(31415)
+        def receiveData = new byte[128]
+        def receivePacket = new DatagramPacket(receiveData, receiveData.length)
+        udpListeningSocket.receive(receivePacket)
+        def data = receivePacket.getData()
 
-            def response = new String(data)
-            def address = receivePacket.getAddress().getHostAddress()
-            if (logEnable) log.debug "sendCommand: Response from Haiku[${address}] ${response}"
-        }
+        def response = new String(data)
+        def address = receivePacket.getAddress().getHostAddress()
+        if (logEnable) log.debug "sendCommand: Response from Haiku[${address}] ${response}"
+    } catch (BindException e) {
+        log.warn "Haiku port 31415 on Hubitat is in use"
     } catch (Exception e) {
         log.error "Call to on failed: ${e.message}"
     } finally {
@@ -144,4 +131,12 @@ def parse(String description) {
 
 static def generateCommand(haikuLocation, haikuSubDevice, haikuFunction, command) {
     return "<${haikuLocation};${haikuSubDevice};${haikuFunction};${command}>"
+}
+
+def sendUDPRequest(address, port, payload) {
+    def hubAction = new hubitat.device.HubAction(payload,
+            hubitat.device.Protocol.LAN,
+            [type: hubitat.device.HubAction.Type.LAN_TYPE_UDPCLIENT,
+             destinationAddress: "${address}:${port}"])
+    sendHubCommand(hubAction)
 }
