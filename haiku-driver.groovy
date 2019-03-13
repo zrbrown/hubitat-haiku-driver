@@ -24,8 +24,11 @@ def updated() {
 def getAllHaikuDevices() {
     def udpListeningSocket = null
     try {
+        def localIp = location.hubs[0].getDataValue("localIP")
+        def subnet = localIp.substring(0, localIp.lastIndexOf("."))
+        log.debug "Broadcasting Haiku get all command on ${subnet}.0/24"
         def haikuCommand = generateCommand("ALL", "DEVICE", "ID", "GET")
-        sendUDPRequest("192.168.1.255", "31415", haikuCommand)
+        sendUDPRequest("${subnet}.255", "31415", haikuCommand)
 
         udpListeningSocket = new DatagramSocket(31415)
         udpListeningSocket.setSoTimeout(3000);
