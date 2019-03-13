@@ -14,11 +14,19 @@ preferences {
 }
 
 def installed() {
-    if (logEnable) log.debug "installed"
+    log.debug "installed"
+}
+
+def initialize() {
+    log.debug "initialized"
 }
 
 def updated() {
-    if (logEnable) log.debug "updated"
+    log.debug "updated"
+}
+
+def parse(String description) {
+    log.debug "parse description: ${description}"
 }
 
 def getAllHaikuDevices() {
@@ -85,6 +93,7 @@ def off() {
 
 def sendLightPowerCommand(String command) {
     sendCommand("LIGHT", "PWR", command)
+    sendEvent(name: "switch", value: "${command}", isStateChange: true)
 }
 
 def setLevel(level) {
@@ -93,6 +102,7 @@ def setLevel(level) {
 
 def setLevel(level, duration) {
     sendLightLevelCommand(level)
+    sendEvent(name: "level", value: "${level}", isStateChange: true)
 }
 
 def sendLightLevelCommand(level) {
@@ -130,6 +140,8 @@ def setSpeed(fanspeed){
             sendFanSpeedCommand(7)
             break
     }
+
+    sendEvent(name: "speed", value: "${fanspeed}", isStateChange: true)
 }
 
 def sendFanPowerCommand(String command) {
@@ -165,10 +177,6 @@ def sendCommand(String haikuSubDevice, String haikuFunction, String command) {
             udpListeningSocket.close()
         }
     }
-}
-
-def parse(String description) {
-    if (logEnable) log.debug "parse description: ${description}"
 }
 
 static def generateCommand(haikuLocation, haikuSubDevice, haikuFunction, command) {
