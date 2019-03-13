@@ -87,9 +87,60 @@ def sendLightPowerCommand(String command) {
     sendCommand("LIGHT", "PWR", command)
 }
 
-def sendCommand(String haikuSubDevice, String haikuFunction, String command) {
-    if (logEnable) log.debug "setting level to ${level} for ${device.deviceNetworkId}"
+def setLevel(level) {
+    setLevel(level, 0)
+}
 
+def setLevel(level, duration) {
+    sendLightLevelCommand(level)
+}
+
+def sendLightLevelCommand(level) {
+    if (level > 16) {
+        level = 16
+    }
+    if (level < 0) {
+        level = 0
+    }
+
+    sendCommand("LIGHT", "LEVEL", "SET;${level}")
+}
+
+def setSpeed(fanspeed){
+    switch (fanspeed) {
+        case "on":
+            sendFanPowerCommand("ON")
+            break
+        case "off":
+            sendFanPowerCommand("OFF")
+            break
+        case "low":
+            sendFanSpeedCommand(1)
+            break
+        case "medium-low":
+            sendFanSpeedCommand(2)
+            break
+        case "medium":
+            sendFanSpeedCommand(4)
+            break
+        case "medium-high":
+            sendFanSpeedCommand(6)
+            break
+        case "high":
+            sendFanSpeedCommand(7)
+            break
+    }
+}
+
+def sendFanPowerCommand(String command) {
+    sendCommand("FAN", "PWR", command)
+}
+
+def sendFanSpeedCommand(int level) {
+    sendCommand("FAN", "SPD", "SET;${level}")
+}
+
+def sendCommand(String haikuSubDevice, String haikuFunction, String command) {
     def udpListeningSocket = null
     try {
         def ipAndRoom = settings.haikuDevice.tokenize(';')
@@ -114,18 +165,6 @@ def sendCommand(String haikuSubDevice, String haikuFunction, String command) {
             udpListeningSocket.close()
         }
     }
-}
-
-def setLevel(level) {
-    setLevel(level, 0)
-}
-
-def setLevel(level, duration) {
-
-}
-
-def setSpeed(fanspeed){
-    if (logEnable) log.debug "in setspeed"
 }
 
 def parse(String description) {
