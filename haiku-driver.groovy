@@ -8,7 +8,8 @@ metadata {
 
 preferences {
     section("Device Selection") {
-        input("haikuDevice", "enum", title: "Select Device", description: "", required: true, defaultValue: "", options: getAllHaikuDevices())
+        input("deviceName", "text", title: "Device Name", description: "", required: true, defaultValue: "")
+        input("deviceIp", "text", title: "Device IP Address", description: "", required: true, defaultValue: "")
         input name: "logEnable", type: "bool", title: "Enable debug logging", defaultValue: true
     }
 }
@@ -27,55 +28,6 @@ def updated() {
 
 def parse(String description) {
     log.debug "parse description: ${description}"
-}
-
-def getAllHaikuDevices() {
-    def udpListeningSocket = null
-    try {
-        def localIp = location.hubs[0].getDataValue("localIP")
-        def subnet = localIp.substring(0, localIp.lastIndexOf("."))
-        log.debug "Broadcasting Haiku get all command on ${subnet}.0/24"
-        def haikuCommand = generateCommand("ALL", "DEVICE", "ID", "GET")
-        sendUDPRequest("${subnet}.255", "31415", haikuCommand)
-
-        udpListeningSocket = new DatagramSocket(31415)
-        udpListeningSocket.setSoTimeout(3000);
-        def optionsMap = new LinkedHashMap()
-        try {
-            while (true) {
-                def receiveData = new byte[128]
-                def receivePacket = new DatagramPacket(receiveData, receiveData.length)
-                udpListeningSocket.receive(receivePacket)
-                def data = receivePacket.getData()
-
-                def response = new String(data).trim()
-                if (!response.isEmpty() && response.charAt(0) == '(') {
-                    String address = receivePacket.getAddress().getHostAddress()
-                    if (logEnable) log.debug "Alive signal from Haiku[${address}] ${response}"
-
-                    def responseParts = response.tokenize(';')
-
-                    if (responseParts.size() > 1 && responseParts.get(1) == "DEVICE") {
-                        def room = responseParts.get(0).substring(1)
-                        def model = responseParts.get(4).substring(0, responseParts.get(4).length() - 1)
-                        optionsMap[("${address};${room}")] = "${room} [${model}]"
-                    }
-                }
-            }
-        } catch (SocketTimeoutException e) {
-        }
-
-        return optionsMap
-    } catch (BindException e) {
-        log.warn "getAllHaikuDevices: Haiku port 31415 on Hubitat is in use"
-    } catch (Exception e) {
-        log.error "Call to on failed: ${e.message}"
-    } finally {
-        if (udpListeningSocket != null) {
-            udpListeningSocket.close()
-        }
-    }
-    return []
 }
 
 def logsOff() {
@@ -153,30 +105,8 @@ def sendFanSpeedCommand(int level) {
 }
 
 def sendCommand(String haikuSubDevice, String haikuFunction, String command) {
-    def udpListeningSocket = null
-    try {
-        def ipAndRoom = settings.haikuDevice.tokenize(';')
-        def haikuCommand = generateCommand(ipAndRoom.get(1), haikuSubDevice, haikuFunction, command)
-        sendUDPRequest(ipAndRoom.get(0), "31415", haikuCommand)
-
-        udpListeningSocket = new DatagramSocket(31415)
-        def receiveData = new byte[128]
-        def receivePacket = new DatagramPacket(receiveData, receiveData.length)
-        udpListeningSocket.receive(receivePacket)
-        def data = receivePacket.getData()
-
-        def response = new String(data)
-        def address = receivePacket.getAddress().getHostAddress()
-        if (logEnable) log.debug "sendCommand: Response from Haiku[${address}] ${response}"
-    } catch (BindException e) {
-        log.warn "Haiku port 31415 on Hubitat is in use"
-    } catch (Exception e) {
-        log.error "Call to on failed: ${e.message}"
-    } finally {
-        if (udpListeningSocket != null) {
-            udpListeningSocket.close()
-        }
-    }
+        def haikuCommand = generateCommand(settings.deviceName, haikuSubDevice, haikuFunction, command)
+        sendUDPRequest(settings.deviceIp, "31415", haikuCommand)
 }
 
 static def generateCommand(haikuLocation, haikuSubDevice, haikuFunction, command) {
