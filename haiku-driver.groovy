@@ -11,7 +11,7 @@ preferences {
     section("Device Selection") {
         input("deviceName", "text", title: "Device Name", description: "", required: true, defaultValue: "")
         input("deviceIp", "text", title: "Device IP Address", description: "", required: true, defaultValue: "")
-        input name: "logEnable", type: "bool", title: "Enable debug logging", defaultValue: true
+        input("logEnable", "bool", title: "Enable debug logging", defaultValue: true)
     }
 }
 
