@@ -92,12 +92,14 @@ def setSpeed(fanspeed){
             sendFanSpeedCommand(7)
             break
     }
-
-    sendEvent(name: "speed", value: "${fanspeed}", isStateChange: true)
 }
 
 def sendFanPowerCommand(String command) {
     sendCommand("FAN", "PWR", command)
+}
+
+def refreshFanSpeed() {
+    sendCommand("FAN", "SPD", "GET;ACTUAL")
 }
 
 def sendFanSpeedCommand(int level) {
@@ -105,12 +107,12 @@ def sendFanSpeedCommand(int level) {
 }
 
 def sendCommand(String haikuSubDevice, String haikuFunction, String command) {
-        def haikuCommand = generateCommand(settings.deviceName, haikuSubDevice, haikuFunction, command)
+        def haikuCommand = generateCommand(haikuSubDevice, haikuFunction, command)
         sendUDPRequest(settings.deviceIp, "31415", haikuCommand)
 }
 
-static def generateCommand(haikuLocation, haikuSubDevice, haikuFunction, command) {
-    return "<${haikuLocation};${haikuSubDevice};${haikuFunction};${command}>"
+static def generateCommand(haikuSubDevice, haikuFunction, command) {
+    return "<ALL;${haikuSubDevice};${haikuFunction};${command}>"
 }
 
 def sendUDPRequest(address, port, payload) {
