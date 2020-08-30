@@ -3,6 +3,7 @@ metadata {
         capability "FanControl"
         capability "SwitchLevel"
         capability "Switch"
+        capability "Refresh"
     }
 }
 
@@ -26,8 +27,59 @@ def updated() {
     log.debug "updated"
 }
 
+def refresh() {
+    sendLightPowerCommand("GET")
+    sendCommand("LIGHT", "LEVEL", "GET;ACTUAL")
+    refreshFanSpeed()
+}
+
 def parse(String description) {
     log.debug "parse description: ${description}"
+    def map = parseLanMessage(description)
+    def bytes = map["payload"].decodeHex()
+    def response = new String(bytes)
+    log.debug "parse response: ${response}"
+    def values = response[1..-2].split(';')
+    switch (values[1]) {
+        case "LIGHT":
+            switch (values[2]) {
+                case "PWR":
+                    return createEvent(name: "switch", value: values[3].toLowerCase())
+                case "LEVEL":
+                    return createEvent(name: "level", value: values[4])
+            }
+            break
+        case "FAN":
+            switch (values[2]) {
+                case "PWR":
+                    switch (values[3]) {
+                        case "OFF":
+                            return createEvent(name: "speed", value: "off")
+                        case "ON":
+                            refreshFanSpeed()
+                            break;
+                    }
+                    break
+                case "SPD":
+                    switch (values[4]) {
+                        case "1":
+                            return createEvent(name: "speed", value: "low")
+                        case "2":
+                            return createEvent(name: "speed", value: "medium-low")
+                        case "3":
+                        case "4":
+                            return createEvent(name: "speed", value: "medium")
+                        case "5":
+                        case "6":
+                            return createEvent(name: "speed", value: "medium-high")
+                        case "7":
+                            return createEvent(name: "speed", value: "high")
+                    }
+                    break
+            }
+            break
+    }
+
 }
 
 def logsOff() {
@@ -45,7 +97,6 @@ def off() {
 
 def sendLightPowerCommand(String command) {
     sendCommand("LIGHT", "PWR", command)
-    sendEvent(name: "switch", value: "${command}", isStateChange: true)
 }
 
 def setLevel(level) {
@@ -54,7 +105,6 @@ def setLevel(level) {
 
 def setLevel(level, duration) {
     sendLightLevelCommand(level)
-    sendEvent(name: "level", value: "${level}", isStateChange: true)
 }
 
 def sendLightLevelCommand(level) {
