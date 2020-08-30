@@ -4,6 +4,10 @@ metadata {
         capability "SwitchLevel"
         capability "Switch"
         capability "Refresh"
+
+        command "reverseFan"
+
+        attribute "fanDirection", "string"
     }
 }
 
@@ -27,9 +31,22 @@ def updated() {
     log.debug "updated"
 }
 
+def setFanDirection(String direction) {
+    sendCommand("FAN", "DIR", "SET;${direction}")
+}
+
+def reverseFan() {
+    if (device.currentValue("fanDirection") == "FWD") {
+        setFanDirection("REV")
+    } else {
+        setFanDirection("FWD")
+    }
+}
+
 def refresh() {
     sendLightPowerCommand("GET")
     sendCommand("LIGHT", "LEVEL", "GET;ACTUAL")
+    sendCommand("FAN", "DIR", "GET")
     refreshFanSpeed()
 }
 
@@ -76,6 +93,8 @@ def parse(String description) {
                             return createEvent(name: "speed", value: "high")
                     }
                     break
+                case "DIR":
+                    return createEvent(name: "fanDirection", value: values[3])
             }
             break
     }
