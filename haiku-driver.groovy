@@ -44,10 +44,8 @@ def reverseFan() {
 }
 
 def refresh() {
-    sendLightPowerCommand("GET")
     sendCommand("LIGHT", "LEVEL", "GET;ACTUAL")
     sendCommand("FAN", "DIR", "GET")
-    refreshFanSpeed()
 }
 
 def parse(String description) {
@@ -61,24 +59,27 @@ def parse(String description) {
         case "LIGHT":
             switch (values[2]) {
                 case "PWR":
+                    refreshFanSpeed()
                     return createEvent(name: "switch", value: values[3].toLowerCase())
                 case "LEVEL":
-                    return createEvent(name: "level", value: values[4])
+                    def events = [];
+                    if (values[4] == "0") {
+                        events << createEvent(name: "switch", value: "off")
+                    } else {
+                        events << createEvent(name: "switch", value: "on")
+                    }
+                    events << createEvent(name: "level", value: values[4])
+                    return events;
             }
             break
         case "FAN":
             switch (values[2]) {
                 case "PWR":
-                    switch (values[3]) {
-                        case "OFF":
-                            return createEvent(name: "speed", value: "off")
-                        case "ON":
-                            refreshFanSpeed()
-                            break;
-                    }
-                    break
+                    return createEvent(name: "speed", value: values[3].toLowerCase())
                 case "SPD":
                     switch (values[4]) {
+                        case "0":
+                            return createEvent(name: "speed", value: "off")
                         case "1":
                             return createEvent(name: "speed", value: "low")
                         case "2":
@@ -94,6 +95,7 @@ def parse(String description) {
                     }
                     break
                 case "DIR":
+                    refreshFanSpeed()
                     return createEvent(name: "fanDirection", value: values[3])
             }
             break
