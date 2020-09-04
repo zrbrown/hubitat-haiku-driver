@@ -58,7 +58,6 @@ def parse(String description) {
         case "LIGHT":
             switch (values[2]) {
                 case "PWR":
-                    refreshFanSpeed()
                     return createEvent(name: "switch", value: values[3].toLowerCase())
                 case "LEVEL":
                     def events = [];
@@ -74,6 +73,7 @@ def parse(String description) {
         case "FAN":
             switch (values[2]) {
                 case "PWR":
+                    refreshFanSpeed()
                     return createEvent(name: "speed", value: values[3].toLowerCase())
                 case "SPD":
                     switch (values[4]) {
