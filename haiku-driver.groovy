@@ -49,7 +49,6 @@ def refresh() {
 }
 
 def parse(String description) {
-    log.debug "parse description: ${description}"
     def map = parseLanMessage(description)
     def bytes = map["payload"].decodeHex()
     def response = new String(bytes)
