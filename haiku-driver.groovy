@@ -3,6 +3,11 @@ metadata {
         capability "FanControl"
         capability "SwitchLevel"
         capability "Switch"
+        capability "Refresh"
+
+        command "reverseFan"
+
+        attribute "fanDirection", "string"
     }
 }
 
@@ -10,7 +15,7 @@ preferences {
     section("Device Selection") {
         input("deviceName", "text", title: "Device Name", description: "", required: true, defaultValue: "")
         input("deviceIp", "text", title: "Device IP Address", description: "", required: true, defaultValue: "")
-        input name: "logEnable", type: "bool", title: "Enable debug logging", defaultValue: true
+        input("logEnable", "bool", title: "Enable debug logging", defaultValue: true)
     }
 }
 
@@ -26,8 +31,75 @@ def updated() {
     log.debug "updated"
 }
 
+def setFanDirection(String direction) {
+    sendCommand("FAN", "DIR", "SET;${direction}")
+}
+
+def reverseFan() {
+    if (device.currentValue("fanDirection") == "FWD") {
+        setFanDirection("REV")
+    } else {
+        setFanDirection("FWD")
+    }
+}
+
+def refresh() {
+    sendCommand("LIGHT", "LEVEL", "GET;ACTUAL")
+    sendCommand("FAN", "DIR", "GET")
+}
+
 def parse(String description) {
-    log.debug "parse description: ${description}"
+    def map = parseLanMessage(description)
+    def bytes = map["payload"].decodeHex()
+    def response = new String(bytes)
+    log.debug "parse response: ${response}"
+    def values = response[1..-2].split(';')
+    switch (values[1]) {
+        case "LIGHT":
+            switch (values[2]) {
+                case "PWR":
+                    return createEvent(name: "switch", value: values[3].toLowerCase())
+                case "LEVEL":
+                    def events = [];
+                    if (values[4] == "0") {
+                        events << createEvent(name: "switch", value: "off")
+                    } else {
+                        events << createEvent(name: "switch", value: "on")
+                    }
+                    events << createEvent(name: "level", value: values[4])
+                    return events;
+            }
+            break
+        case "FAN":
+            switch (values[2]) {
+                case "PWR":
+                    refreshFanSpeed()
+                    return createEvent(name: "speed", value: values[3].toLowerCase())
+                case "SPD":
+                    switch (values[4]) {
+                        case "0":
+                            return createEvent(name: "speed", value: "off")
+                        case "1":
+                            return createEvent(name: "speed", value: "low")
+                        case "2":
+                            return createEvent(name: "speed", value: "medium-low")
+                        case "3":
+                        case "4":
+                            return createEvent(name: "speed", value: "medium")
+                        case "5":
+                        case "6":
+                            return createEvent(name: "speed", value: "medium-high")
+                        case "7":
+                            return createEvent(name: "speed", value: "high")
+                    }
+                    break
+                case "DIR":
+                    refreshFanSpeed()
+                    return createEvent(name: "fanDirection", value: values[3])
+            }
+            break
+    }
+
 }
 
 def logsOff() {
@@ -45,7 +117,6 @@ def off() {
 
 def sendLightPowerCommand(String command) {
     sendCommand("LIGHT", "PWR", command)
-    sendEvent(name: "switch", value: "${command}", isStateChange: true)
 }
 
 def setLevel(level) {
@@ -54,7 +125,6 @@ def setLevel(level) {
 
 def setLevel(level, duration) {
     sendLightLevelCommand(level)
-    sendEvent(name: "level", value: "${level}", isStateChange: true)
 }
 
 def sendLightLevelCommand(level) {
@@ -92,12 +162,14 @@ def setSpeed(fanspeed){
             sendFanSpeedCommand(7)
             break
     }
-
-    sendEvent(name: "speed", value: "${fanspeed}", isStateChange: true)
 }
 
 def sendFanPowerCommand(String command) {
     sendCommand("FAN", "PWR", command)
+}
+
+def refreshFanSpeed() {
+    sendCommand("FAN", "SPD", "GET;ACTUAL")
 }
 
 def sendFanSpeedCommand(int level) {
@@ -105,12 +177,12 @@ def sendFanSpeedCommand(int level) {
 }
 
 def sendCommand(String haikuSubDevice, String haikuFunction, String command) {
-        def haikuCommand = generateCommand(settings.deviceName, haikuSubDevice, haikuFunction, command)
+        def haikuCommand = generateCommand(haikuSubDevice, haikuFunction, command)
         sendUDPRequest(settings.deviceIp, "31415", haikuCommand)
 }
 
-static def generateCommand(haikuLocation, haikuSubDevice, haikuFunction, command) {
-    return "<${haikuLocation};${haikuSubDevice};${haikuFunction};${command}>"
+static def generateCommand(haikuSubDevice, haikuFunction, command) {
+    return "<ALL;${haikuSubDevice};${haikuFunction};${command}>"
 }
 
 def sendUDPRequest(address, port, payload) {
