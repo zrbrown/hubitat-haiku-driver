@@ -3,6 +3,7 @@ metadata {
         capability "FanControl"
         capability "SwitchLevel"
         capability "Switch"
+        capability "Light"
         capability "Refresh"
 
         command "reverseFan"
@@ -66,7 +67,9 @@ def parse(String description) {
                     } else {
                         events << createEvent(name: "switch", value: "on")
                     }
-                    events << createEvent(name: "level", value: values[4])
+                    level = Math.round(values[4].toInteger() * 6.25)
+                    log.debug "Using new level ${level}"
+                    events << createEvent(name: "level", value: level)
                     return events;
             }
             break
@@ -128,14 +131,17 @@ def setLevel(level, duration) {
 }
 
 def sendLightLevelCommand(level) {
-    if (level > 16) {
-        level = 16
+    if (level > 100) {
+        level = 100
     }
     if (level < 0) {
         level = 0
     }
+    
+    Integer haikuLevel = Math.round(level / 6.25)
+    log.debug "level [${level}] haikuLevel [${haikuLevel}]"
 
-    sendCommand("LIGHT", "LEVEL", "SET;${level}")
+    sendCommand("LIGHT", "LEVEL", "SET;${haikuLevel}")
 }
 
 def setSpeed(fanspeed){
