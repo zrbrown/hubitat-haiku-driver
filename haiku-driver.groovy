@@ -36,10 +36,6 @@ def installed() {
     log.debug "installed"
 }
 
-def initialize() {
-    log.debug "initialized"
-}
-
 def updated() {
     log.debug "updated"
 }
