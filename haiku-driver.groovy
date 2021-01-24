@@ -1,3 +1,5 @@
+import groovy.transform.Field
+
 metadata {
     definition(name: "Haiku Fan", namespace: "community", author: "Zack Brown") {
         capability "FanControl"
@@ -19,6 +21,16 @@ preferences {
         input("logEnable", "bool", title: "Enable debug logging", defaultValue: true)
     }
 }
+
+//
+// Constants
+//
+// Number of light graduations Haiku supports.
+@Field final int HAIKU_LIGHT_LEVELS = 16
+
+// Ratio of light levels to percentage level. 1 Haiku light level every 6.25%
+@Field final double HAIKU_LIGHT_SPREAD = (double)100/HAIKU_LIGHT_LEVELS
+
 
 def installed() {
     log.debug "installed"
@@ -67,8 +79,7 @@ def parse(String description) {
                     } else {
                         events << createEvent(name: "switch", value: "on")
                     }
-                    level = Math.round(values[4].toInteger() * 6.25)
-                    log.debug "Using new level ${level}"
+                    int level = (int)Math.ceil(values[4].toInteger() * HAIKU_LIGHT_SPREAD)
                     events << createEvent(name: "level", value: level)
                     return events;
             }
@@ -138,7 +149,7 @@ def sendLightLevelCommand(level) {
         level = 0
     }
     
-    Integer haikuLevel = Math.round(level / 6.25)
+    int haikuLevel = (int)Math.ceil(level / HAIKU_LIGHT_SPREAD)
     log.debug "level [${level}] haikuLevel [${haikuLevel}]"
 
     sendCommand("LIGHT", "LEVEL", "SET;${haikuLevel}")
