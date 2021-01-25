@@ -1,8 +1,11 @@
+import groovy.transform.Field
+
 metadata {
     definition(name: "Haiku Fan", namespace: "community", author: "Zack Brown") {
         capability "FanControl"
         capability "SwitchLevel"
         capability "Switch"
+        capability "Light"
         capability "Refresh"
 
         command "reverseFan"
@@ -19,12 +22,18 @@ preferences {
     }
 }
 
+//
+// Constants
+//
+// Number of light graduations Haiku supports.
+@Field final int HAIKU_LIGHT_LEVELS = 16
+
+// Ratio of light levels to percentage level. 1 Haiku light level every 6.25%
+@Field final double HAIKU_LIGHT_SPREAD = (double)100/HAIKU_LIGHT_LEVELS
+
+
 def installed() {
     log.debug "installed"
-}
-
-def initialize() {
-    log.debug "initialized"
 }
 
 def updated() {
@@ -66,7 +75,8 @@ def parse(String description) {
                     } else {
                         events << createEvent(name: "switch", value: "on")
                     }
-                    events << createEvent(name: "level", value: values[4])
+                    int level = (int)Math.ceil(values[4].toInteger() * HAIKU_LIGHT_SPREAD)
+                    events << createEvent(name: "level", value: level)
                     return events;
             }
             break
@@ -128,14 +138,17 @@ def setLevel(level, duration) {
 }
 
 def sendLightLevelCommand(level) {
-    if (level > 16) {
-        level = 16
+    if (level > 100) {
+        level = 100
     }
     if (level < 0) {
         level = 0
     }
+    
+    int haikuLevel = (int)Math.ceil(level / HAIKU_LIGHT_SPREAD)
+    log.debug "level [${level}] haikuLevel [${haikuLevel}]"
 
-    sendCommand("LIGHT", "LEVEL", "SET;${level}")
+    sendCommand("LIGHT", "LEVEL", "SET;${haikuLevel}")
 }
 
 def setSpeed(fanspeed){
