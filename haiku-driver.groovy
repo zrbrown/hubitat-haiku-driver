@@ -26,7 +26,8 @@ metadata {
         attribute "whoosh", "string"
         attribute "sleep", "string"
         attribute "fanAuto", "string"
-        attribute "fanLevel", "string"
+        attribute "fanLevel", "number"
+        attribute "lightPresent", "string"
         attribute "SNSROCCcurr", "string"
     }
 }
@@ -47,11 +48,11 @@ preferences {
 @Field final int HAIKU_LIGHT_LEVELS = 16
 
 // Ratio of light levels to percentage level. 1 Haiku light level every 6.25%
-@Field final double HAIKU_LIGHT_SPREAD = (double)100/HAIKU_LIGHT_LEVELS
+@Field final double HAIKU_LIGHT_SPREAD = (double)Math.ceil(100/HAIKU_LIGHT_LEVELS)
 
-@Field final int HAIKU_FAN_LEVELS = 8
+@Field final int HAIKU_FAN_LEVELS = 7
 
-@Field final double HAIKU_FAN_SPREAD = (double)100/HAIKU_FAN_LEVELS
+@Field final double HAIKU_FAN_SPREAD = (double)Math.ceil(100/HAIKU_FAN_LEVELS)
 
 def installed() {
     log.debug "installed"
@@ -78,6 +79,7 @@ def reverseFan() {
 }
 
 def refresh() {
+    sendCommand("DEVICE","LIGHT","GET")
     sendCommand("LIGHT", "LEVEL", "GET;ACTUAL")
     sendCommand("FAN", "WHOOSH", "GET;STATUS")
     sendCommand("SLEEP", "STATE", "GET")
@@ -148,8 +150,10 @@ def parse(String description) {
             return sendEvent(name: "sleep", value: values[3].toLowerCase())
         case "DEVICE":
             switch (values[2].toLowerCase()) {
-                case "ID":
+                case "id":
                     return sendEvent(name: "deviceID", value: values[3])
+                case "light":
+                    return sendEvent(name: "lightPresent", value: values[3].toLowerCase())
             }
             break
         case "SNSROCC":
@@ -266,6 +270,7 @@ def sendFanLevel(level) {
     }
     
     int haikuFanLevel = (int)Math.ceil(level / HAIKU_FAN_SPREAD)
+    log.debug "Fan Spread [${HAIKU_FAN_SPREAD}]"
     log.debug "Fan level [${level}] haikuFanLevel [${haikuFanLevel}]"
 
     sendFanSpeedCommand(haikuFanLevel)
